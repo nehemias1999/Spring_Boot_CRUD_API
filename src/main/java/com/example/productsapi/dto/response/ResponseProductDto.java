@@ -20,4 +20,5 @@ public class ResponseProductDto {
     private Long stock;
     private Double base_price;
     private Double cost_price;
+
 }

@@ -1,0 +1,40 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ${MYSQL_CONTAINER_NAME}
+    ports:
+      - "${MYSQL_CONTAINER_PORT}:${MYSQL_PORT}"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: always
+    networks:
+      - api-network
+
+  api:
+    build: .
+    container_name: ${API_CONTAINER_NAME}
+    ports:
+      - "${API_CONTAINER_PORT}:${API_PORT}"
+    environment:
+      - MYSQL_HOST=${MYSQL_CONTAINER_NAME}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    depends_on:
+      - mysql
+#    restart: always
+    networks:
+      - api-network
+
+volumes:
+  mysql-data:
+
+networks:
+  api-network:
+    driver: bridge

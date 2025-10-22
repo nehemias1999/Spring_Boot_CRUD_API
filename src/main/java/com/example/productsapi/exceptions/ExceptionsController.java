@@ -26,4 +26,5 @@ public class ExceptionsController {
         ResponseErrorDto responseErrorDto = new ResponseErrorDto(HttpStatus.BAD_REQUEST, invalidDataEntryException.getMessage());
         return new ResponseEntity<>(responseErrorDto, HttpStatus.BAD_REQUEST);
     }
+
 }

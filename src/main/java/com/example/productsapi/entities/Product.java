@@ -22,4 +22,5 @@ public class Product {
     private Long stock;
     private Double base_price;
     private Double cost_price;
+
 }

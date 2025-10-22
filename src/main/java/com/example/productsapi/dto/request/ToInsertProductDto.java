@@ -19,4 +19,5 @@ public class ToInsertProductDto {
     private Long stock;
     private Double base_price;
     private Double cost_price;
+
 }

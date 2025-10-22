@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping("/api/v1/products")
 public class ProductsController {
 
     private final IProductService productService;
@@ -56,4 +56,5 @@ public class ProductsController {
 
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
+
 }
