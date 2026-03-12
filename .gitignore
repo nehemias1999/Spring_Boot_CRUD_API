@@ -14,3 +14,6 @@ target/
 
 # Archivos generados por Maven para el proyecto
 .mvn/
+
+#Archivo de configuración de Claude
+.claude
