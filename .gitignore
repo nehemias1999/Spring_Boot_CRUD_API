@@ -15,8 +15,9 @@ target/
 # Archivos generados por Maven para el proyecto
 .mvn/
 
-#Archivo de configuración de Claude
+#Archivos de configuración de Claude
 .claude
+CLAUDE.md
 
 # Base de datos H2 local (dev)
 data/
