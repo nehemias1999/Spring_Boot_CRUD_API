@@ -2,6 +2,7 @@ package com.example.productsapi.product.infrastructure.adapter.out.persistence;
 
 import com.example.productsapi.product.application.port.out.IProductRepositoryPort;
 import com.example.productsapi.product.domain.Product;
+import com.example.productsapi.product.domain.ProductFilter;
 import com.example.productsapi.product.domain.exception.InvalidDataEntryException;
 import jakarta.persistence.PersistenceException;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +13,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
@@ -23,7 +26,7 @@ public class ProductPersistenceAdapter implements IProductRepositoryPort {
     private final IProductPersistenceMapper mapper;
 
     @Override
-    public Optional<Product> findById(Long id) {
+    public Optional<Product> findById(UUID id) {
         log.debug("findById - Querying database for product with id={}", id);
         Optional<Product> result = productJpaRepository.findById(id).map(mapper::toDomain);
         log.debug("findById - Query result for id={}: {}", id, result.isPresent() ? "found" : "not found");
@@ -31,17 +34,19 @@ public class ProductPersistenceAdapter implements IProductRepositoryPort {
     }
 
     @Override
-    public Page<Product> findAll(Pageable pageable) {
+    public Page<Product> findAll(Pageable pageable, ProductFilter filter) {
         log.debug("findAll - Querying database: page={}, size={}, sort={}",
                 pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
-        Page<Product> page = productJpaRepository.findAll(pageable).map(mapper::toDomain);
+        Page<Product> page = productJpaRepository
+                .findAll(ProductSpecification.withFilter(filter), pageable)
+                .map(mapper::toDomain);
         log.debug("findAll - Query returned {} records out of {} total",
                 page.getNumberOfElements(), page.getTotalElements());
         return page;
     }
 
     @Override
-    public boolean existsById(Long id) {
+    public boolean existsById(UUID id) {
         log.debug("existsById - Checking existence in database for product with id={}", id);
         boolean exists = productJpaRepository.existsById(id);
         log.debug("existsById - Product id={} exists: {}", id, exists);
@@ -57,7 +62,7 @@ public class ProductPersistenceAdapter implements IProductRepositoryPort {
     }
 
     @Override
-    public boolean existsByNameAndIdNot(String name, Long id) {
+    public boolean existsByNameAndIdNot(String name, UUID id) {
         log.debug("existsByNameAndIdNot - Checking if name '{}' is taken by another product (excluding id={})", name, id);
         boolean exists = productJpaRepository.existsByNameAndIdNot(name, id);
         log.debug("existsByNameAndIdNot - Name '{}' taken by another product: {}", name, exists);
@@ -70,7 +75,11 @@ public class ProductPersistenceAdapter implements IProductRepositoryPort {
         log.debug("save - {} product in database: name='{}', id={}",
                 isUpdate ? "Updating" : "Inserting", product.getName(), product.getId());
         try {
-            Product saved = mapper.toDomain(productJpaRepository.save(mapper.toJpaEntity(product)));
+            ProductJpaEntity entity = mapper.toJpaEntity(product);
+            if (isUpdate) {
+                entity.setUpdatedAt(LocalDateTime.now());
+            }
+            Product saved = mapper.toDomain(productJpaRepository.save(entity));
             log.debug("save - Product persisted successfully with id={}", saved.getId());
             return saved;
         } catch (DataIntegrityViolationException | JpaSystemException | PersistenceException e) {
@@ -81,10 +90,13 @@ public class ProductPersistenceAdapter implements IProductRepositoryPort {
     }
 
     @Override
-    public void deleteById(Long id) {
-        log.debug("deleteById - Deleting product with id={} from database", id);
-        productJpaRepository.deleteById(id);
-        log.debug("deleteById - Product with id={} removed from database", id);
+    public void deleteById(UUID id) {
+        log.debug("deleteById - Soft-deleting product with id={}", id);
+        productJpaRepository.findById(id).ifPresent(entity -> {
+            entity.setDeletedAt(LocalDateTime.now());
+            productJpaRepository.save(entity);
+            log.debug("deleteById - Product with id={} marked as deleted", id);
+        });
     }
 
 }

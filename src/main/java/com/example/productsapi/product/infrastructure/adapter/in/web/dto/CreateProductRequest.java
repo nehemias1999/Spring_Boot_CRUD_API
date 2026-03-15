@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -25,10 +27,10 @@ public class CreateProductRequest {
 
     @NotNull(message = "Base price is required")
     @Positive(message = "Base price must be positive")
-    private Double base_price;
+    private BigDecimal basePrice;
 
     @NotNull(message = "Cost price is required")
     @Positive(message = "Cost price must be positive")
-    private Double cost_price;
+    private BigDecimal costPrice;
 
 }

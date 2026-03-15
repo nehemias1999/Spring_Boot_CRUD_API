@@ -1,6 +1,7 @@
 package com.example.productsapi.product.infrastructure.adapter.in.web;
 
 import com.example.productsapi.product.application.port.in.IProductUseCase;
+import com.example.productsapi.product.domain.ProductFilter;
 import com.example.productsapi.product.infrastructure.adapter.in.web.dto.CreateProductRequest;
 import com.example.productsapi.product.infrastructure.adapter.in.web.dto.PagedResponse;
 import com.example.productsapi.product.infrastructure.adapter.in.web.dto.PatchProductRequest;
@@ -19,7 +20,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.math.BigDecimal;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -31,17 +33,21 @@ public class ProductController {
     private final IProductUseCase productUseCase;
     private final IProductWebMapper mapper;
 
-    @Operation(summary = "Get all products", description = "Returns a paginated and sorted list of all products.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Products retrieved successfully"),
-            @ApiResponse(responseCode = "404", description = "No products found")
-    })
-    @GetMapping("/getAll")
-    public ResponseEntity<PagedResponse<ProductResponse>> getAllProductsPagedAndSorted(Pageable pageable) {
-        log.info("GET /getAll - Request received: page={}, size={}, sort={}",
-                pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
+    @Operation(summary = "Get all products", description = "Returns a paginated and sorted list of products. Supports filtering by name (partial match), minPrice, maxPrice, and minStock.")
+    @ApiResponse(responseCode = "200", description = "Products retrieved successfully")
+    @GetMapping
+    public ResponseEntity<PagedResponse<ProductResponse>> getAllProductsPagedAndSorted(
+            Pageable pageable,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Long minStock) {
+        log.info("GET / - Request received: page={}, size={}, sort={}, name={}, minPrice={}, maxPrice={}, minStock={}",
+                pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort(),
+                name, minPrice, maxPrice, minStock);
 
-        Page<ProductResponse> page = productUseCase.getAllProducts(pageable)
+        ProductFilter filter = new ProductFilter(name, minPrice, maxPrice, minStock);
+        Page<ProductResponse> page = productUseCase.getAllProducts(pageable, filter)
                 .map(mapper::toResponse);
 
         PagedResponse<ProductResponse> response = new PagedResponse<>(
@@ -53,8 +59,8 @@ public class ProductController {
                 page.isLast()
         );
 
-        log.info("GET /getAll - Returning {} products (page {}/{})",
-                page.getNumberOfElements(), page.getNumber() + 1, page.getTotalPages());
+        log.info("GET / - Returning {} products (page {}/{}, total={})",
+                page.getNumberOfElements(), page.getNumber() + 1, page.getTotalPages(), page.getTotalElements());
         return ResponseEntity.ok(response);
     }
 
@@ -63,13 +69,13 @@ public class ProductController {
             @ApiResponse(responseCode = "200", description = "Product found"),
             @ApiResponse(responseCode = "404", description = "Product not found")
     })
-    @GetMapping("/get/{id}")
-    public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
-        log.info("GET /get/{} - Request received", id);
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductResponse> getProductById(@PathVariable UUID id) {
+        log.info("GET /{} - Request received", id);
 
         ProductResponse response = mapper.toResponse(productUseCase.getProductById(id));
 
-        log.info("GET /get/{} - Product found: name='{}'", id, response.getName());
+        log.info("GET /{} - Product found: name='{}'", id, response.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -79,14 +85,14 @@ public class ProductController {
             @ApiResponse(responseCode = "400", description = "Validation failed or invalid data"),
             @ApiResponse(responseCode = "409", description = "A product with that name already exists")
     })
-    @PostMapping("/create")
+    @PostMapping
     public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody CreateProductRequest request) {
-        log.info("POST /create - Request received: name='{}', stock={}, basePrice={}, costPrice={}",
-                request.getName(), request.getStock(), request.getBase_price(), request.getCost_price());
+        log.info("POST / - Request received: name='{}', stock={}, basePrice={}, costPrice={}",
+                request.getName(), request.getStock(), request.getBasePrice(), request.getCostPrice());
 
         ProductResponse response = mapper.toResponse(productUseCase.createProduct(mapper.toDomain(request)));
 
-        log.info("POST /create - Product created successfully: id={}, name='{}'",
+        log.info("POST / - Product created successfully: id={}, name='{}'",
                 response.getId(), response.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -98,16 +104,16 @@ public class ProductController {
             @ApiResponse(responseCode = "404", description = "Product not found"),
             @ApiResponse(responseCode = "409", description = "A product with that name already exists")
     })
-    @PutMapping("/update/{id}")
+    @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             @Valid @RequestBody UpdateProductRequest request) {
-        log.info("PUT /update/{} - Request received: name='{}', stock={}, basePrice={}, costPrice={}",
-                id, request.getName(), request.getStock(), request.getBase_price(), request.getCost_price());
+        log.info("PUT /{} - Request received: name='{}', stock={}, basePrice={}, costPrice={}",
+                id, request.getName(), request.getStock(), request.getBasePrice(), request.getCostPrice());
 
         ProductResponse response = mapper.toResponse(productUseCase.updateProduct(id, mapper.toDomain(request)));
 
-        log.info("PUT /update/{} - Product updated successfully: name='{}'", id, response.getName());
+        log.info("PUT /{} - Product updated successfully: name='{}'", id, response.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -118,15 +124,15 @@ public class ProductController {
             @ApiResponse(responseCode = "404", description = "Product not found"),
             @ApiResponse(responseCode = "409", description = "A product with that name already exists")
     })
-    @PatchMapping("/update/{id}")
+    @PatchMapping("/{id}")
     public ResponseEntity<ProductResponse> patchProduct(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             @Valid @RequestBody PatchProductRequest request) {
-        log.info("PATCH /update/{} - Request received: {}", id, request);
+        log.info("PATCH /{} - Request received: {}", id, request);
 
         ProductResponse response = mapper.toResponse(productUseCase.patchProduct(id, mapper.toPatch(request)));
 
-        log.info("PATCH /update/{} - Product patched successfully: name='{}'", id, response.getName());
+        log.info("PATCH /{} - Product patched successfully: name='{}'", id, response.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -135,13 +141,13 @@ public class ProductController {
             @ApiResponse(responseCode = "204", description = "Product deleted successfully"),
             @ApiResponse(responseCode = "404", description = "Product not found")
     })
-    @DeleteMapping("/delete/{id}")
-    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
-        log.info("DELETE /delete/{} - Request received", id);
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable UUID id) {
+        log.info("DELETE /{} - Request received", id);
 
         productUseCase.deleteProduct(id);
 
-        log.info("DELETE /delete/{} - Product deleted successfully", id);
+        log.info("DELETE /{} - Product deleted successfully", id);
         return ResponseEntity.noContent().build();
     }
 

@@ -1,11 +1,15 @@
 package com.example.productsapi.product.infrastructure.adapter.out.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-public interface IProductJpaRepository extends JpaRepository<ProductJpaEntity, Long> {
+import java.util.UUID;
+
+public interface IProductJpaRepository extends JpaRepository<ProductJpaEntity, UUID>,
+        JpaSpecificationExecutor<ProductJpaEntity> {
 
     boolean existsByName(String name);
 
-    boolean existsByNameAndIdNot(String name, Long id);
+    boolean existsByNameAndIdNot(String name, UUID id);
 
 }

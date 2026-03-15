@@ -17,3 +17,6 @@ target/
 
 #Archivo de configuración de Claude
 .claude
+
+# Base de datos H2 local (dev)
+data/

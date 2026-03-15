@@ -2,25 +2,23 @@ package com.example.productsapi.product.domain;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Getter
-@Setter
 public class Product {
 
-    private Long id;
+    private UUID id;
     private String name;
     private String description;
     private Long stock;
-    private Double base_price;
-    private Double cost_price;
+    private BigDecimal basePrice;
+    private BigDecimal costPrice;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

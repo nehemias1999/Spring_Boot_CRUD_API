@@ -3,9 +3,9 @@ package com.example.productsapi.product.application.service;
 import com.example.productsapi.product.application.port.in.IProductUseCase;
 import com.example.productsapi.product.application.port.out.IProductRepositoryPort;
 import com.example.productsapi.product.domain.Product;
+import com.example.productsapi.product.domain.ProductFilter;
 import com.example.productsapi.product.domain.ProductPatch;
 import com.example.productsapi.product.domain.exception.DuplicateProductNameException;
-import com.example.productsapi.product.domain.exception.EmptyProductsListException;
 import com.example.productsapi.product.domain.exception.ProductNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +16,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,7 +27,7 @@ public class ProductService implements IProductUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<Product> getAllProducts(Pageable pageable) {
+    public Page<Product> getAllProducts(Pageable pageable, ProductFilter filter) {
         log.debug("getAllProducts - Fetching page {} with size {} and sort '{}'",
                 pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
 
@@ -34,13 +36,9 @@ public class ProductService implements IProductUseCase {
                         pageable.getPageNumber(),
                         pageable.getPageSize(),
                         pageable.getSortOr(Sort.by(Sort.Direction.ASC, "id"))
-                )
+                ),
+                filter
         );
-
-        if (productsPage.isEmpty()) {
-            log.warn("getAllProducts - No products found in the database");
-            throw new EmptyProductsListException();
-        }
 
         log.debug("getAllProducts - Found {} products (total elements: {})",
                 productsPage.getNumberOfElements(), productsPage.getTotalElements());
@@ -49,7 +47,7 @@ public class ProductService implements IProductUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public Product getProductById(Long id) {
+    public Product getProductById(UUID id) {
         log.debug("getProductById - Looking for product with id={}", id);
 
         Product product = productRepositoryPort.findById(id)
@@ -81,7 +79,7 @@ public class ProductService implements IProductUseCase {
 
     @Override
     @Transactional
-    public Product updateProduct(Long id, Product product) {
+    public Product updateProduct(UUID id, Product product) {
         log.debug("updateProduct - Looking for product with id={}", id);
 
         Product existing = productRepositoryPort.findById(id)
@@ -95,11 +93,11 @@ public class ProductService implements IProductUseCase {
             throw new DuplicateProductNameException(product.getName());
         }
 
-        existing.setName(product.getName());
-        existing.setDescription(product.getDescription());
-        existing.setStock(product.getStock());
-        existing.setBase_price(product.getBase_price());
-        existing.setCost_price(product.getCost_price());
+        if (product.getName() != null)        existing.setName(product.getName());
+        if (product.getDescription() != null) existing.setDescription(product.getDescription());
+        if (product.getStock() != null)       existing.setStock(product.getStock());
+        if (product.getBasePrice() != null)   existing.setBasePrice(product.getBasePrice());
+        if (product.getCostPrice() != null)   existing.setCostPrice(product.getCostPrice());
 
         log.debug("updateProduct - Persisting updated data for product id={}: name='{}', stock={}",
                 id, existing.getName(), existing.getStock());
@@ -111,7 +109,7 @@ public class ProductService implements IProductUseCase {
 
     @Override
     @Transactional
-    public Product patchProduct(Long id, ProductPatch patch) {
+    public Product patchProduct(UUID id, ProductPatch patch) {
         log.debug("patchProduct - Looking for product with id={}", id);
 
         Product existing = productRepositoryPort.findById(id)
@@ -128,8 +126,8 @@ public class ProductService implements IProductUseCase {
         if (patch.getName() != null)        existing.setName(patch.getName());
         if (patch.getDescription() != null) existing.setDescription(patch.getDescription());
         if (patch.getStock() != null)       existing.setStock(patch.getStock());
-        if (patch.getBase_price() != null)  existing.setBase_price(patch.getBase_price());
-        if (patch.getCost_price() != null)  existing.setCost_price(patch.getCost_price());
+        if (patch.getBasePrice() != null)   existing.setBasePrice(patch.getBasePrice());
+        if (patch.getCostPrice() != null)   existing.setCostPrice(patch.getCostPrice());
 
         log.debug("patchProduct - Persisting patched product id={}", id);
         Product patched = productRepositoryPort.save(existing);
@@ -140,7 +138,7 @@ public class ProductService implements IProductUseCase {
 
     @Override
     @Transactional
-    public void deleteProduct(Long id) {
+    public void deleteProduct(UUID id) {
         log.debug("deleteProduct - Checking existence of product with id={}", id);
 
         if (!productRepositoryPort.existsById(id)) {

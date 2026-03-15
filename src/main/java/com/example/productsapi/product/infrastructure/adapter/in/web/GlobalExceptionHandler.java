@@ -1,7 +1,6 @@
 package com.example.productsapi.product.infrastructure.adapter.in.web;
 
 import com.example.productsapi.product.domain.exception.DuplicateProductNameException;
-import com.example.productsapi.product.domain.exception.EmptyProductsListException;
 import com.example.productsapi.product.domain.exception.InvalidDataEntryException;
 import com.example.productsapi.product.domain.exception.ProductNotFoundException;
 import com.example.productsapi.product.infrastructure.adapter.in.web.dto.ErrorResponse;
@@ -13,20 +12,13 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
 @ControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
-
-    @ExceptionHandler(EmptyProductsListException.class)
-    public ResponseEntity<ErrorResponse> emptyProductsList(EmptyProductsListException ex) {
-        log.warn("Empty products list: {}", ex.getMessage());
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage()));
-    }
 
     @ExceptionHandler(ProductNotFoundException.class)
     public ResponseEntity<ErrorResponse> productNotFound(ProductNotFoundException ex) {
@@ -62,6 +54,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(new ValidationErrorResponse(HttpStatus.BAD_REQUEST, "Validation failed", fieldErrors));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String message = String.format("Invalid value '%s' for parameter '%s'", ex.getValue(), ex.getName());
+        log.warn("Type mismatch: {}", message);
+        return ResponseEntity
+                .badRequest()
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST, message));
     }
 
     @ExceptionHandler(Exception.class)

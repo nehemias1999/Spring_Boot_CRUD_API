@@ -7,6 +7,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -22,9 +24,9 @@ public class PatchProductRequest {
     private Long stock;
 
     @Positive(message = "Base price must be positive")
-    private Double base_price;
+    private BigDecimal basePrice;
 
     @Positive(message = "Cost price must be positive")
-    private Double cost_price;
+    private BigDecimal costPrice;
 
 }

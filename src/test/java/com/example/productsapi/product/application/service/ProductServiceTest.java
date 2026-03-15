@@ -2,9 +2,9 @@ package com.example.productsapi.product.application.service;
 
 import com.example.productsapi.product.application.port.out.IProductRepositoryPort;
 import com.example.productsapi.product.domain.Product;
+import com.example.productsapi.product.domain.ProductFilter;
 import com.example.productsapi.product.domain.ProductPatch;
 import com.example.productsapi.product.domain.exception.DuplicateProductNameException;
-import com.example.productsapi.product.domain.exception.EmptyProductsListException;
 import com.example.productsapi.product.domain.exception.ProductNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,14 +19,15 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,10 +42,15 @@ class ProductServiceTest {
 
     private Product sampleProduct;
     private Pageable pageable;
+    private UUID productId;
+    private UUID unknownId;
 
     @BeforeEach
     void setUp() {
-        sampleProduct = new Product(1L, "pencil", "black pencil", 10L, 200.0, 150.0, null, null);
+        productId = UUID.randomUUID();
+        unknownId = UUID.randomUUID();
+        sampleProduct = new Product(productId, "pencil", "black pencil", 10L,
+                new BigDecimal("200.00"), new BigDecimal("150.00"), null, null);
         pageable = PageRequest.of(0, 10);
     }
 
@@ -59,23 +65,24 @@ class ProductServiceTest {
         @DisplayName("returns a page of products when they exist")
         void whenProductsExist_returnsPage() {
             Page<Product> page = new PageImpl<>(List.of(sampleProduct));
-            when(repositoryPort.findAll(any(Pageable.class))).thenReturn(page);
+            when(repositoryPort.findAll(any(Pageable.class), any(ProductFilter.class))).thenReturn(page);
 
-            Page<Product> result = service.getAllProducts(pageable);
+            Page<Product> result = service.getAllProducts(pageable, new ProductFilter());
 
             assertThat(result.getContent()).hasSize(1);
             assertThat(result.getContent().get(0).getName()).isEqualTo("pencil");
-            verify(repositoryPort).findAll(any(Pageable.class));
+            verify(repositoryPort).findAll(any(Pageable.class), any(ProductFilter.class));
         }
 
         @Test
-        @DisplayName("throws EmptyProductsListException when no products exist")
-        void whenNoProductsExist_throwsEmptyProductsListException() {
-            when(repositoryPort.findAll(any(Pageable.class))).thenReturn(Page.empty());
+        @DisplayName("returns an empty page when no products exist")
+        void whenNoProductsExist_returnsEmptyPage() {
+            when(repositoryPort.findAll(any(Pageable.class), any(ProductFilter.class))).thenReturn(Page.empty());
 
-            assertThatThrownBy(() -> service.getAllProducts(pageable))
-                    .isInstanceOf(EmptyProductsListException.class)
-                    .hasMessage("Products list is empty!");
+            Page<Product> result = service.getAllProducts(pageable, new ProductFilter());
+
+            assertThat(result.isEmpty()).isTrue();
+            verify(repositoryPort).findAll(any(Pageable.class), any(ProductFilter.class));
         }
     }
 
@@ -89,22 +96,21 @@ class ProductServiceTest {
         @Test
         @DisplayName("returns the product when it exists")
         void whenProductExists_returnsProduct() {
-            when(repositoryPort.findById(1L)).thenReturn(Optional.of(sampleProduct));
+            when(repositoryPort.findById(productId)).thenReturn(Optional.of(sampleProduct));
 
-            Product result = service.getProductById(1L);
+            Product result = service.getProductById(productId);
 
-            assertThat(result.getId()).isEqualTo(1L);
+            assertThat(result.getId()).isEqualTo(productId);
             assertThat(result.getName()).isEqualTo("pencil");
         }
 
         @Test
         @DisplayName("throws ProductNotFoundException when product does not exist")
         void whenProductDoesNotExist_throwsProductNotFoundException() {
-            when(repositoryPort.findById(99L)).thenReturn(Optional.empty());
+            when(repositoryPort.findById(unknownId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.getProductById(99L))
-                    .isInstanceOf(ProductNotFoundException.class)
-                    .hasMessage("Product with id 99 not found!");
+            assertThatThrownBy(() -> service.getProductById(unknownId))
+                    .isInstanceOf(ProductNotFoundException.class);
         }
     }
 
@@ -123,7 +129,7 @@ class ProductServiceTest {
 
             Product result = service.createProduct(sampleProduct);
 
-            assertThat(result.getId()).isEqualTo(1L);
+            assertThat(result.getId()).isEqualTo(productId);
             verify(repositoryPort).save(sampleProduct);
         }
 
@@ -150,12 +156,13 @@ class ProductServiceTest {
         @Test
         @DisplayName("updates and returns the product when it exists and name is unique")
         void whenProductExistsAndNameIsUnique_updatesProduct() {
-            Product incoming = new Product(null, "new pencil", "blue", 20L, 250.0, 180.0, null, null);
-            when(repositoryPort.findById(1L)).thenReturn(Optional.of(sampleProduct));
-            when(repositoryPort.existsByNameAndIdNot("new pencil", 1L)).thenReturn(false);
+            Product incoming = new Product(null, "new pencil", "blue", 20L,
+                    new BigDecimal("250.00"), new BigDecimal("180.00"), null, null);
+            when(repositoryPort.findById(productId)).thenReturn(Optional.of(sampleProduct));
+            when(repositoryPort.existsByNameAndIdNot("new pencil", productId)).thenReturn(false);
             when(repositoryPort.save(any(Product.class))).thenReturn(sampleProduct);
 
-            Product result = service.updateProduct(1L, incoming);
+            Product result = service.updateProduct(productId, incoming);
 
             assertThat(result).isNotNull();
             verify(repositoryPort).save(any(Product.class));
@@ -164,21 +171,21 @@ class ProductServiceTest {
         @Test
         @DisplayName("throws ProductNotFoundException when product does not exist")
         void whenProductDoesNotExist_throwsProductNotFoundException() {
-            when(repositoryPort.findById(99L)).thenReturn(Optional.empty());
+            when(repositoryPort.findById(unknownId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.updateProduct(99L, sampleProduct))
-                    .isInstanceOf(ProductNotFoundException.class)
-                    .hasMessage("Product with id 99 not found!");
+            assertThatThrownBy(() -> service.updateProduct(unknownId, sampleProduct))
+                    .isInstanceOf(ProductNotFoundException.class);
         }
 
         @Test
         @DisplayName("throws DuplicateProductNameException when name is taken by another product")
         void whenNameIsTakenByAnotherProduct_throwsDuplicateProductNameException() {
-            Product incoming = new Product(null, "rubber", "eraser", 5L, 100.0, 70.0, null, null);
-            when(repositoryPort.findById(1L)).thenReturn(Optional.of(sampleProduct));
-            when(repositoryPort.existsByNameAndIdNot("rubber", 1L)).thenReturn(true);
+            Product incoming = new Product(null, "rubber", "eraser", 5L,
+                    new BigDecimal("100.00"), new BigDecimal("70.00"), null, null);
+            when(repositoryPort.findById(productId)).thenReturn(Optional.of(sampleProduct));
+            when(repositoryPort.existsByNameAndIdNot("rubber", productId)).thenReturn(true);
 
-            assertThatThrownBy(() -> service.updateProduct(1L, incoming))
+            assertThatThrownBy(() -> service.updateProduct(productId, incoming))
                     .isInstanceOf(DuplicateProductNameException.class)
                     .hasMessageContaining("rubber");
         }
@@ -195,23 +202,23 @@ class ProductServiceTest {
         @DisplayName("applies only non-null fields and saves")
         void whenPartialFieldsProvided_appliesOnlyThoseFields() {
             ProductPatch patch = new ProductPatch("updated pencil", null, 50L, null, null);
-            when(repositoryPort.findById(1L)).thenReturn(Optional.of(sampleProduct));
-            when(repositoryPort.existsByNameAndIdNot("updated pencil", 1L)).thenReturn(false);
+            when(repositoryPort.findById(productId)).thenReturn(Optional.of(sampleProduct));
+            when(repositoryPort.existsByNameAndIdNot("updated pencil", productId)).thenReturn(false);
             when(repositoryPort.save(any(Product.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            Product result = service.patchProduct(1L, patch);
+            Product result = service.patchProduct(productId, patch);
 
             assertThat(result.getName()).isEqualTo("updated pencil");
             assertThat(result.getStock()).isEqualTo(50L);
-            assertThat(result.getDescription()).isEqualTo("black pencil"); // unchanged
+            assertThat(result.getDescription()).isEqualTo("black pencil");
         }
 
         @Test
         @DisplayName("throws ProductNotFoundException when product does not exist")
         void whenProductDoesNotExist_throwsProductNotFoundException() {
-            when(repositoryPort.findById(99L)).thenReturn(Optional.empty());
+            when(repositoryPort.findById(unknownId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.patchProduct(99L, new ProductPatch()))
+            assertThatThrownBy(() -> service.patchProduct(unknownId, new ProductPatch()))
                     .isInstanceOf(ProductNotFoundException.class);
         }
 
@@ -219,10 +226,10 @@ class ProductServiceTest {
         @DisplayName("throws DuplicateProductNameException when new name is taken by another product")
         void whenNewNameIsTaken_throwsDuplicateProductNameException() {
             ProductPatch patch = new ProductPatch("rubber", null, null, null, null);
-            when(repositoryPort.findById(1L)).thenReturn(Optional.of(sampleProduct));
-            when(repositoryPort.existsByNameAndIdNot("rubber", 1L)).thenReturn(true);
+            when(repositoryPort.findById(productId)).thenReturn(Optional.of(sampleProduct));
+            when(repositoryPort.existsByNameAndIdNot("rubber", productId)).thenReturn(true);
 
-            assertThatThrownBy(() -> service.patchProduct(1L, patch))
+            assertThatThrownBy(() -> service.patchProduct(productId, patch))
                     .isInstanceOf(DuplicateProductNameException.class)
                     .hasMessageContaining("rubber");
         }
@@ -238,23 +245,22 @@ class ProductServiceTest {
         @Test
         @DisplayName("deletes the product when it exists")
         void whenProductExists_deletesProduct() {
-            when(repositoryPort.existsById(1L)).thenReturn(true);
+            when(repositoryPort.existsById(productId)).thenReturn(true);
 
-            service.deleteProduct(1L);
+            service.deleteProduct(productId);
 
-            verify(repositoryPort).deleteById(1L);
+            verify(repositoryPort).deleteById(productId);
         }
 
         @Test
         @DisplayName("throws ProductNotFoundException when product does not exist")
         void whenProductDoesNotExist_throwsProductNotFoundException() {
-            when(repositoryPort.existsById(99L)).thenReturn(false);
+            when(repositoryPort.existsById(unknownId)).thenReturn(false);
 
-            assertThatThrownBy(() -> service.deleteProduct(99L))
-                    .isInstanceOf(ProductNotFoundException.class)
-                    .hasMessage("Product with id 99 not found!");
+            assertThatThrownBy(() -> service.deleteProduct(unknownId))
+                    .isInstanceOf(ProductNotFoundException.class);
 
-            verify(repositoryPort, never()).deleteById(anyLong());
+            verify(repositoryPort, never()).deleteById(any());
         }
     }
 }

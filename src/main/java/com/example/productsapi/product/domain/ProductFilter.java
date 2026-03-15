@@ -9,12 +9,11 @@ import java.math.BigDecimal;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class ProductPatch {
+public class ProductFilter {
 
     private String name;
-    private String description;
-    private Long stock;
-    private BigDecimal basePrice;
-    private BigDecimal costPrice;
+    private BigDecimal minPrice;
+    private BigDecimal maxPrice;
+    private Long minStock;
 
 }
